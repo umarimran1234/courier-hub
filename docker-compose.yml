@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: courier
+      POSTGRES_PASSWORD: courier
+      POSTGRES_DB: courierhub
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courier -d courierhub"]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://courier:courier@db:5432/courierhub
+      REDIS_URL: redis://redis:6379
+    ports: ["3000:3000"]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+volumes:
+  pgdata:
+  redisdata:

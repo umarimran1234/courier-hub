@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Courier {
+  POSTEX
+  LEOPARDS
+  TCS
+}
+
+enum ShipmentStatus {
+  CREATED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERY_ATTEMPT_FAILED
+  ON_HOLD
+  DELIVERED
+  RETURN_IN_PROGRESS
+  RETURNED
+  CANCELLED
+  LOST_OR_DAMAGED
+  UNKNOWN
+}
+
+/// Your customers (e.g. a Shopify store / merchant using your platform).
+model Tenant {
+  id            String          @id @default(cuid())
+  name          String
+  apiKeyHash    String          @unique
+  webhookUrl    String?
+  webhookSecret String?
+  createdAt     DateTime        @default(now())
+  accounts      CourierAccount[]
+  shipments     Shipment[]
+}
+
+/// A tenant's own credentials for one courier (encrypted at rest).
+model CourierAccount {
+  id             String     @id @default(cuid())
+  tenantId       String
+  courier        Courier
+  label          String     @default("default")
+  credentialsEnc String
+  sandbox        Boolean    @default(false)
+  active         Boolean    @default(true)
+  webhookToken   String     @unique @default(cuid())
+  createdAt      DateTime   @default(now())
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shipments      Shipment[]
+
+  @@unique([tenantId, courier, label])
+  @@index([tenantId])
+}
+
+model Shipment {
+  id             String          @id @default(cuid())
+  tenantId       String
+  accountId      String
+  courier        Courier
+  trackingNumber String
+  orderRef       String?
+  status         ShipmentStatus  @default(CREATED)
+  rawStatus      String?
+  codAmount      Int?
+  consigneeName  String?
+  consigneePhone String?
+  city           String?
+  labelUrl       String?
+  deliveredAt    DateTime?
+  lastSyncedAt   DateTime?
+  syncError      String?
+  isTerminal     Boolean         @default(false)
+  bookingRaw     Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account        CourierAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  events         ShipmentEvent[]
+
+  @@unique([courier, trackingNumber])
+  @@index([tenantId, status])
+  @@index([isTerminal, lastSyncedAt])
+  @@index([orderRef])
+}
+
+model ShipmentEvent {
+  id          String         @id @default(cuid())
+  shipmentId  String
+  status      ShipmentStatus
+  rawStatus   String
+  location    String?
+  note        String?
+  occurredAt  DateTime
+  createdAt   DateTime       @default(now())
+  shipment    Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, occurredAt, rawStatus])
+  @@index([shipmentId, occurredAt])
+}
+
+/// Raw courier statuses the mapper could not classify. Review and extend the mapping.
+model UnmappedStatus {
+  id        String   @id @default(cuid())
+  courier   Courier
+  rawStatus String
+  count     Int      @default(1)
+  lastSeen  DateTime @default(now())
+
+  @@unique([courier, rawStatus])
+}
