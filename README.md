@@ -36,7 +36,26 @@ curl -X POST :3000/v1/shipments -H 'x-api-key: chk_...' -H 'content-type: applic
 curl :3000/v1/shipments/track/postex/CX-1234 -H 'x-api-key: chk_...'
 ```
 
-## Credentials per courier
+## Tracking WITHOUT merchants connecting accounts (platform mode)
+
+Put **your own** courier credentials in `PLATFORM_COURIERS` (see `.env.example`). Any tenant with an `x-api-key`
+can then look up any tracking number; nothing is stored and no courier account is needed per merchant:
+
+```bash
+curl :3000/v1/track/tcs/779412326902      -H 'x-api-key: chk_...'
+curl :3000/v1/track/postex/CX-1234567     -H 'x-api-key: chk_...'
+curl -X POST :3000/v1/track/bulk -H 'x-api-key: chk_...' -H 'content-type: application/json' \
+     -d '{"items":[{"courier":"leopards","trackingNumber":"LE1234567890"},{"courier":"tcs","trackingNumber":"779412326902"}]}'
+```
+
+Results are cached (`TRACK_CACHE_SECONDS`, final states for 1h) to protect courier rate limits.
+
+**Important, not yet confirmed:** this only works if the courier API returns parcels that were booked by *other*
+merchants when called with *your* credentials. PostEx and Leopards document tracking as per-merchant, so it may only
+return your own parcels. TCS tracking (client id/secret bearer) may be broader. Test each courier once with a tracking number
+that is not yours. If a courier refuses, use an aggregator (AfterShip / TrackingMore / 17TRACK) for that courier, or have the merchant connect an account (`/v1/accounts`, below).
+
+## Credentials per courier (per-merchant accounts, needed for booking/cancel/sync)
 
 | Courier | `credentials` fields |
 |---|---|
@@ -107,5 +126,5 @@ The broad "in transit" keywords (hub, station, warehouse…) are deliberately la
 
 ```bash
 npm test                                   # 67 unit tests (mapper, parsers, adapters with stubbed HTTP, crypto)
-DATABASE_URL=... REDIS_URL=... npm run test:e2e   # 18 end-to-end tests on real Postgres + Redis
+DATABASE_URL=... REDIS_URL=... npm run test:e2e   # 27 end-to-end tests on real Postgres + Redis
 ```
