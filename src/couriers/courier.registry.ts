@@ -4,6 +4,9 @@ import { CourierAdapter } from './courier.types';
 import { PostexAdapter } from './adapters/postex.adapter';
 import { LeopardsAdapter } from './adapters/leopards.adapter';
 import { TcsAdapter } from './adapters/tcs.adapter';
+import { FedexAdapter } from './adapters/fedex.adapter';
+import { DhlAdapter } from './adapters/dhl.adapter';
+import { AramexAdapter } from './adapters/aramex.adapter';
 
 /**
  * Add a new courier = write one adapter class, add it to this constructor, and add the value to the Courier enum.
@@ -12,8 +15,8 @@ import { TcsAdapter } from './adapters/tcs.adapter';
 export class CourierRegistry {
   private readonly adapters: Map<Courier, CourierAdapter>;
 
-  constructor(postex: PostexAdapter, leopards: LeopardsAdapter, tcs: TcsAdapter) {
-    this.adapters = new Map<Courier, CourierAdapter>([postex, leopards, tcs].map((a) => [a.courier, a]));
+  constructor(postex: PostexAdapter, leopards: LeopardsAdapter, tcs: TcsAdapter, fedex: FedexAdapter, dhl: DhlAdapter, aramex: AramexAdapter) {
+    this.adapters = new Map<Courier, CourierAdapter>([postex, leopards, tcs, fedex, dhl, aramex].map((a) => [a.courier, a]));
   }
 
   get(courier: Courier): CourierAdapter {

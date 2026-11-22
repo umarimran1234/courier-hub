@@ -1,6 +1,6 @@
 # courier-hub
 
-One NestJS backend that talks to **PostEx, Leopards and TCS** so your app only ever calls *this* API:
+One NestJS backend that talks to **PostEx, Leopards, TCS** (full: tracking, booking, cancel) and **FedEx, DHL, Aramex** (tracking only) so your app only ever calls *this* API:
 book a parcel, get its status by tracking number, cancel, fetch the label, and receive status-change webhooks —
 with one request format and one set of status values, whichever courier is behind it.
 
@@ -68,6 +68,18 @@ background sync and webhooks use `/v1/shipments` (below).
 | POSTEX | `token`, optional `pickupAddressCode`, `storeAddressCode` |
 | LEOPARDS | `apiKey`, `apiPassword`, optional `originCityId`, `shipperName/Email/Phone/Address` (default `self` = account profile), `shipmentType`, `fallbackEmail`; `"sandbox": true` uses the staging host |
 | TCS | `username`, `password`, `accountNo`, `costCenterCode`, `shipperName`, `shipperAddress`, `shipperCity`, `shipperMobile`; optional `serviceCode` (default `O`), `clientId` + `clientSecret` (for the tracking API bearer token); `"sandbox": true` uses `devconnect.tcscourier.com` |
+
+### International couriers (tracking only)
+
+| Courier | `credentials` fields | Where the merchant gets them |
+|---|---|---|
+| FEDEX | `clientId`, `clientSecret` (optional `childKey`, `childSecret` for Compatible/Parent-Child accounts); `"sandbox": true` uses `apis-sandbox.fedex.com` | developer.fedex.com project (Track API); production keys need an account number linked to the project |
+| DHL | `apiKey` (optional `service`, `requesterCountryCode`) | free Consumer Key from developer.dhl.com (Shipment Tracking, Unified API). No DHL Express account needed for tracking |
+| ARAMEX | `userName`, `password`, `accountNumber`, `accountPin`, `accountEntity`, `accountCountryCode`; optional `baseUrl`; `"sandbox": true` uses `ws.dev.aramex.net` | Aramex account (ask your Aramex representative) |
+
+FedEx, DHL and Aramex are **tracking-only**: booking, cancel and labels answer `501 not supported` (those APIs need customs and payment data).
+Their request/response shapes follow the public docs but are **not yet verified against live accounts**
+(`capabilities.track.verified=false` in `GET /v1/couriers`).
 
 ## API
 

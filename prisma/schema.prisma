@@ -11,6 +11,9 @@ enum Courier {
   POSTEX
   LEOPARDS
   TCS
+  FEDEX
+  DHL
+  ARAMEX
 }
 
 enum ShipmentStatus {

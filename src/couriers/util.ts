@@ -90,3 +90,13 @@ export class TtlCache<V> {
     this.m.set(k, { v, exp: Date.now() + ttlMs });
   }
 }
+
+/** ISO-8601 or Microsoft JSON "/Date(1546331411000+0300)/" (used by Aramex). Returns undefined if unparsable. */
+export function parseIsoOrMsDate(v: unknown): Date | undefined {
+  if (v === undefined || v === null || v === '') return undefined;
+  const str = String(v);
+  const ms = /\/Date\((-?\d+)/.exec(str);
+  if (ms) return new Date(Number(ms[1]));
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? undefined : d;
+}

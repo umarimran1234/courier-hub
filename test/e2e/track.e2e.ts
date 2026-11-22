@@ -136,7 +136,7 @@ describe('per-merchant tracking and isolation', () => {
   });
 
   it('validates input', async () => {
-    expect((await call('GET', '/v1/track/fedex/123456', undefined, keyA)).status).toBe(400);
+    expect((await call('GET', '/v1/track/ups/123456', undefined, keyA)).status).toBe(400);
     expect((await call('GET', '/v1/track/postex/a', undefined, keyA)).status).toBe(400);
     expect((await call('GET', '/v1/track/postex/' + encodeURIComponent("x'; DROP TABLE"), undefined, keyA)).status).toBe(400);
   });
@@ -200,5 +200,15 @@ describe('per-merchant tracking and isolation', () => {
     expect(JSON.stringify(listB.json)).toMatch(/DUP-1/);
     const rawA = JSON.stringify(listA.json);
     expect((rawA.match(/DUP-1/g) || []).length).toBe(1);
+  });
+
+  it('international couriers: credential validation per courier, merchant-scoped', async () => {
+    const bad = await call('POST', '/v1/accounts', { courier: 'FEDEX', credentials: { clientId: 'x' } }, keyB);
+    expect(bad.status).toBe(400);
+    expect(bad.json.message).toMatch(/Missing credential fields for FEDEX: clientSecret/);
+    const dhl = await call('POST', '/v1/accounts', { courier: 'dhl', credentials: { apiKey: 'DHL-KEY' }, verify: false }, keyB);
+    expect(dhl.status).toBe(201);
+    expect((await call('GET', '/v1/track', undefined, keyB)).json.connected.map((c: any) => c.courier).sort()).toEqual(['DHL', 'POSTEX']);
+    expect((await call('GET', '/v1/track', undefined, keyA)).json.connected.map((c: any) => c.courier)).not.toContain('DHL');
   });
 });

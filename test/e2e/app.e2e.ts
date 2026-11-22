@@ -142,8 +142,14 @@ describe('courier-hub e2e', () => {
 
   it('lists supported couriers and capability flags', async () => {
     const r = await call('GET', '/v1/couriers', { key: keyA });
-    expect(r.json.map((c: any) => c.courier).sort()).toEqual(['LEOPARDS', 'POSTEX', 'TCS']);
+    expect(r.json.map((c: any) => c.courier).sort()).toEqual(['ARAMEX', 'DHL', 'FEDEX', 'LEOPARDS', 'POSTEX', 'TCS']);
     expect(r.json.find((c: any) => c.courier === 'LEOPARDS').capabilities.cancel.verified).toBe(false);
+    // international couriers are tracking-only
+    for (const n of ['FEDEX', 'DHL', 'ARAMEX']) {
+      const caps = r.json.find((c: any) => c.courier === n).capabilities;
+      expect(caps.track.supported).toBe(true);
+      expect(caps.book.supported).toBe(false);
+    }
   });
 
   it('validates credentials fields and stores them encrypted', async () => {

@@ -22,6 +22,29 @@ const CODE_OVERRIDES: Partial<Record<Courier, Record<string, ShipmentStatus>>> =
     DAE: ShipmentStatus.IN_TRANSIT,
     DFM: ShipmentStatus.IN_TRANSIT,
   },
+  // FedEx Track API derivedStatusCode / eventType codes.
+  FEDEX: {
+    OC: ShipmentStatus.CREATED,
+    IN: ShipmentStatus.CREATED,
+    PU: ShipmentStatus.PICKED_UP,
+    IT: ShipmentStatus.IN_TRANSIT,
+    AR: ShipmentStatus.IN_TRANSIT,
+    DP: ShipmentStatus.IN_TRANSIT,
+    OD: ShipmentStatus.OUT_FOR_DELIVERY,
+    DL: ShipmentStatus.DELIVERED,
+    DE: ShipmentStatus.DELIVERY_ATTEMPT_FAILED,
+    HL: ShipmentStatus.ON_HOLD,
+    SE: ShipmentStatus.ON_HOLD,
+    CA: ShipmentStatus.CANCELLED,
+    RS: ShipmentStatus.RETURN_IN_PROGRESS,
+  },
+  // DHL Shipment Tracking (Unified) API statusCode values.
+  DHL: {
+    'PRE-TRANSIT': ShipmentStatus.CREATED,
+    TRANSIT: ShipmentStatus.IN_TRANSIT,
+    DELIVERED: ShipmentStatus.DELIVERED,
+    FAILURE: ShipmentStatus.DELIVERY_ATTEMPT_FAILED,
+  },
 };
 
 interface Rule {
@@ -47,6 +70,7 @@ const RULES: Rule[] = [
   },
 
   // Holds / reviews / waiting for the customer.
+  { re: /held (by|at|in|for) (customs|clearance)|customs (hold|delay|issue|inspection)|clearance (delay|pending|required|issue)|\bheld\b/i, status: ShipmentStatus.ON_HOLD },
   {
     re: /on hold|\bhold\b|awaiting (receiver|customer|consignee|collection)|self[- ]?collect|ready (for|to) (collect|be collected)|available for (pickup|collection)|under (review|verification)|verification|pending (verification|approval|confirmation)|delivery under review|shipper advice|disputed/i,
     status: ShipmentStatus.ON_HOLD,
@@ -65,7 +89,7 @@ const RULES: Rule[] = [
   { re: /picked( up)?|pick-?up (done|completed|successful)|collected from (shipper|merchant)|received from (shipper|merchant)|shipment (picked|collected)/i, status: ShipmentStatus.PICKED_UP },
 
   {
-    re: /transit|arrived|departed|dispatch|en-?route|warehouse|ware house|facility|\bhub\b|received at|reached|forwarded|sorted|sorting|bagged|bagging|loaded|in station|origin|destination|station|route|connected|gateway|network/i,
+    re: /transit|customs|clearance|cleared|arrived|departed|dispatch|en-?route|warehouse|ware house|facility|\bhub\b|received at|reached|forwarded|sorted|sorting|bagged|bagging|loaded|in station|origin|destination|station|route|connected|gateway|network/i,
     status: ShipmentStatus.IN_TRANSIT,
   },
 ];
