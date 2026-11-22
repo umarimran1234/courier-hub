@@ -28,7 +28,7 @@ enum ShipmentStatus {
   UNKNOWN
 }
 
-/// Your customers (e.g. a Shopify store / merchant using your platform).
+/// One merchant. Fully isolated: own API key, own courier accounts (credentials), own shipments.
 model Tenant {
   id            String          @id @default(cuid())
   name          String
@@ -83,7 +83,7 @@ model Shipment {
   account        CourierAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   events         ShipmentEvent[]
 
-  @@unique([courier, trackingNumber])
+  @@unique([tenantId, courier, trackingNumber])
   @@index([tenantId, status])
   @@index([isTerminal, lastSyncedAt])
   @@index([orderRef])

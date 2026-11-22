@@ -1,18 +1,18 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Courier } from '@prisma/client';
+import { Courier, Tenant } from '@prisma/client';
 import { CourierRegistry } from '../couriers/courier.registry';
 import { TERMINAL_STATUSES } from '../couriers/courier.types';
 import { TtlCache } from '../couriers/util';
 import { ShipmentsService } from '../shipments/shipments.service';
-import { PlatformAccountsService } from './platform-accounts.service';
+import { AccountsService } from '../accounts/accounts.service';
 
 const TN_RE = /^[A-Za-z0-9][A-Za-z0-9\-_.]{3,39}$/;
 
 /**
- * Stateless "give me the status of this courier ID" service.
- * Uses the platform's own courier credentials; nothing is stored, merchants connect nothing.
- * Results are cached briefly (long for final states) to protect the courier APIs and your rate limits.
+ * Stateless "give me the status of this courier ID" service, run with the CALLING MERCHANT's own connected
+ * courier account (POST /v1/accounts). Nothing is stored. Cache keys include the merchant + account, so one
+ * merchant's lookups/credentials never leak into another's. Results are cached briefly (long for final states).
  */
 @Injectable()
 export class TrackService {
@@ -22,7 +22,7 @@ export class TrackService {
 
   constructor(
     private registry: CourierRegistry,
-    private platform: PlatformAccountsService,
+    private accounts: AccountsService,
     private shipments: ShipmentsService,
     cfg: ConfigService,
   ) {
@@ -36,60 +36,72 @@ export class TrackService {
     return t;
   }
 
-  private remember(courier: Courier, tn: string, view: any) {
+  private key(tenantId: string, accountId: string, tn: string) {
+    return `${tenantId}:${accountId}:${tn}`;
+  }
+
+  private remember(key: string, view: any) {
     if (!view.found || this.ttlMs === 0) return;
     const final = TERMINAL_STATUSES.includes(view.status);
-    this.cache.set(`${courier}:${tn}`, view, final ? this.finalTtlMs : this.ttlMs);
+    this.cache.set(key, view, final ? this.finalTtlMs : this.ttlMs);
   }
 
-  couriers() {
-    return { configured: this.platform.configured() };
+  /** Which couriers this merchant has connected. */
+  async connected(tenant: Tenant) {
+    const rows = await this.accounts.list(tenant.id);
+    return { connected: rows.filter((r) => r.active).map((r) => ({ accountId: r.id, courier: r.courier, label: r.label })) };
   }
 
-  async track(courierInput: string, trackingNumber: string) {
+  async track(tenant: Tenant, courierInput: string, trackingNumber: string, accountId?: string) {
     const courier = this.registry.parse(courierInput);
     const tn = this.clean(trackingNumber);
-    const hit = this.cache.get(`${courier}:${tn}`);
+    const acc = await this.accounts.resolve(tenant.id, courier, accountId);
+    const key = this.key(tenant.id, acc.id, tn);
+    const hit = this.cache.get(key);
     if (hit) return { courier, cached: true, ...hit };
 
-    const r = await this.registry.get(courier).track(this.platform.get(courier), tn);
+    const r = await this.registry.get(courier).track(this.accounts.toContext(acc), tn);
     const view = this.shipments.liveView(r);
-    this.remember(courier, tn, view);
+    this.remember(key, view);
     return { courier, cached: false, ...view };
   }
 
-  async trackBulk(items: { courier: string; trackingNumber: string }[]) {
+  async trackBulk(tenant: Tenant, items: { courier: string; trackingNumber: string; accountId?: string }[]) {
     const out: any[] = new Array(items.length);
-    const groups = new Map<Courier, { idx: number; tn: string }[]>();
+    const groups = new Map<string, { courier: Courier; accountId?: string; list: { idx: number; tn: string }[] }>();
 
     items.forEach((it, idx) => {
       try {
         const courier = this.registry.parse(it.courier);
         const tn = this.clean(it.trackingNumber);
-        const hit = this.cache.get(`${courier}:${tn}`);
-        if (hit) {
-          out[idx] = { courier, cached: true, ...hit };
-          return;
-        }
-        if (!groups.has(courier)) groups.set(courier, []);
-        groups.get(courier)!.push({ idx, tn });
+        const gk = `${courier}:${it.accountId ?? ''}`;
+        if (!groups.has(gk)) groups.set(gk, { courier, accountId: it.accountId, list: [] });
+        groups.get(gk)!.list.push({ idx, tn });
       } catch (e) {
         out[idx] = { courier: it.courier, trackingNumber: it.trackingNumber, error: (e as Error).message };
       }
     });
 
-    for (const [courier, list] of groups) {
+    for (const g of groups.values()) {
       try {
-        const unique = [...new Set(list.map((l) => l.tn))];
-        const results = await this.registry.get(courier).trackMany(this.platform.get(courier), unique);
+        const acc = await this.accounts.resolve(tenant.id, g.courier, g.accountId);
+        const pending: { idx: number; tn: string }[] = [];
+        for (const l of g.list) {
+          const hit = this.cache.get(this.key(tenant.id, acc.id, l.tn));
+          if (hit) out[l.idx] = { courier: g.courier, cached: true, ...hit };
+          else pending.push(l);
+        }
+        if (!pending.length) continue;
+        const unique = [...new Set(pending.map((l) => l.tn))];
+        const results = await this.registry.get(g.courier).trackMany(this.accounts.toContext(acc), unique);
         const byTn = new Map(results.map((r) => [r.trackingNumber, this.shipments.liveView(r)]));
-        for (const l of list) {
+        for (const l of pending) {
           const view = byTn.get(l.tn)!;
-          this.remember(courier, l.tn, view);
-          out[l.idx] = { courier, cached: false, ...view };
+          this.remember(this.key(tenant.id, acc.id, l.tn), view);
+          out[l.idx] = { courier: g.courier, cached: false, ...view };
         }
       } catch (e) {
-        for (const l of list) out[l.idx] = { courier, trackingNumber: l.tn, error: (e as Error).message };
+        for (const l of g.list) if (!out[l.idx]) out[l.idx] = { courier: g.courier, trackingNumber: l.tn, error: (e as Error).message };
       }
     }
     return { results: out };

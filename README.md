@@ -36,26 +36,32 @@ curl -X POST :3000/v1/shipments -H 'x-api-key: chk_...' -H 'content-type: applic
 curl :3000/v1/shipments/track/postex/CX-1234 -H 'x-api-key: chk_...'
 ```
 
-## Tracking WITHOUT merchants connecting accounts (platform mode)
+## Merchant model (each merchant is isolated)
 
-Put **your own** courier credentials in `PLATFORM_COURIERS` (see `.env.example`). Any tenant with an `x-api-key`
-can then look up any tracking number; nothing is stored and no courier account is needed per merchant:
+One **tenant = one merchant**. Your app creates a tenant per merchant (`POST /v1/admin/tenants`, `x-admin-key`) and stores the
+returned `apiKey` against that merchant. The merchant then connects **their own** courier account (client id/secret, token,
+username/password: see the table below) through your app, which calls `POST /v1/accounts` with that merchant's key.
+
+- Credentials are AES-256-GCM encrypted at rest, verified live against the courier on connect, and never returned by the API.
+- Accounts, shipments, events, webhooks and cache entries are all scoped to the merchant. Merchant B can never read, use or delete merchant A's data (covered by e2e tests).
+- Tracking uses only the calling merchant's own account. If they haven't connected that courier you get `404 No active <COURIER> account connected`.
 
 ```bash
-curl :3000/v1/track/tcs/779412326902      -H 'x-api-key: chk_...'
-curl :3000/v1/track/postex/CX-1234567     -H 'x-api-key: chk_...'
-curl -X POST :3000/v1/track/bulk -H 'x-api-key: chk_...' -H 'content-type: application/json' \
+# merchant connects their courier (your app calls this with the merchant's key)
+curl -X POST :3000/v1/accounts -H 'x-api-key: chk_MERCHANT' -H 'content-type: application/json' \
+     -d '{"courier":"TCS","credentials":{"username":"...","password":"...","clientId":"...","clientSecret":"..."}}'
+
+# status of any tracking number via that merchant's account (nothing stored)
+curl :3000/v1/track/tcs/779412326902  -H 'x-api-key: chk_MERCHANT'
+curl :3000/v1/track                   -H 'x-api-key: chk_MERCHANT'     # which couriers this merchant connected
+curl -X POST :3000/v1/track/bulk -H 'x-api-key: chk_MERCHANT' -H 'content-type: application/json' \
      -d '{"items":[{"courier":"leopards","trackingNumber":"LE1234567890"},{"courier":"tcs","trackingNumber":"779412326902"}]}'
 ```
 
-Results are cached (`TRACK_CACHE_SECONDS`, final states for 1h) to protect courier rate limits.
+`/v1/track/*` results are cached per merchant+account (`TRACK_CACHE_SECONDS`, final states for 1h). For stored shipments with
+background sync and webhooks use `/v1/shipments` (below).
 
-**Important, not yet confirmed:** this only works if the courier API returns parcels that were booked by *other*
-merchants when called with *your* credentials. PostEx and Leopards document tracking as per-merchant, so it may only
-return your own parcels. TCS tracking (client id/secret bearer) may be broader. Test each courier once with a tracking number
-that is not yours. If a courier refuses, use an aggregator (AfterShip / TrackingMore / 17TRACK) for that courier, or have the merchant connect an account (`/v1/accounts`, below).
-
-## Credentials per courier (per-merchant accounts, needed for booking/cancel/sync)
+## Credentials per courier (what each merchant provides)
 
 | Courier | `credentials` fields |
 |---|---|

@@ -15,7 +15,6 @@ import { PrismaModule } from './prisma/prisma.service';
 import { ShipmentsController } from './shipments/shipments.controller';
 import { ShipmentsService } from './shipments/shipments.service';
 import { SyncProcessor, SyncScheduler, SYNC_QUEUE } from './sync/sync.service';
-import { PlatformAccountsService } from './track/platform-accounts.service';
 import { TrackController } from './track/track.controller';
 import { TrackService } from './track/track.service';
 import { WebhooksController } from './webhooks/webhooks.controller';
@@ -39,7 +38,6 @@ import { WebhooksController } from './webhooks/webhooks.controller';
     AccountsService,
     ShipmentsService,
     NotifyService,
-    PlatformAccountsService,
     TrackService,
     NotifyProcessor,
     SyncScheduler,
