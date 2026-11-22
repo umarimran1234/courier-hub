@@ -81,6 +81,24 @@ FedEx, DHL and Aramex are **tracking-only**: booking, cancel and labels answer `
 Their request/response shapes follow the public docs but are **not yet verified against live accounts**
 (`capabilities.track.verified=false` in `GET /v1/couriers`).
 
+### Regional couriers (tracking only, public docs)
+
+| Courier | `credentials` fields | Where the merchant gets them |
+|---|---|---|
+| ECOURIER (Bangladesh) | `apiKey`, `apiSecret`, `userId`; `"sandbox": true` uses `staging.ecourier.com.bd` | eCourier merchant panel / account manager (Reseller API) |
+| REDX (Bangladesh) | `accessToken` | RedX merchant panel, Developer API |
+| PATHAO (Bangladesh) | `clientId`, `clientSecret`, `username`, `password`; `"sandbox": true` for the sandbox host | Pathao merchant panel > Developers API (username/password = panel login) |
+| BOSTA (Egypt/KSA) | `apiKey` | Bosta dashboard > Settings > API Integration |
+| SHIPROCKET (India) | `email`, `password` | Shiprocket > Settings > API > Create an API User (use that user, not the main login) |
+| TRANZO (Pakistan) | `apiToken`, `baseUrl` | Tranzo gives both with the integration docs |
+
+Same rules as above: tracking-only, shapes taken from public docs/SDKs, **not yet verified against live accounts**.
+
+### Not integrated yet (no public API docs)
+
+M&P, BlueEx, Swyft, Daewoo, Trax/Sonic, InstaWorld, Dex, DigiDokaan, Flaship, Dot Express and the smaller Pakistani couriers
+only hand out API docs to merchants/partners. Once you have the doc for one, it is one adapter file (see `src/couriers/adapters/`).
+
 ## API
 
 All `/v1/*` routes except admin and inbound webhooks need `x-api-key`.

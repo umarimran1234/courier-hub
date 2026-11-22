@@ -7,6 +7,12 @@ import { TcsAdapter } from './adapters/tcs.adapter';
 import { FedexAdapter } from './adapters/fedex.adapter';
 import { DhlAdapter } from './adapters/dhl.adapter';
 import { AramexAdapter } from './adapters/aramex.adapter';
+import { EcourierAdapter } from './adapters/ecourier.adapter';
+import { RedxAdapter } from './adapters/redx.adapter';
+import { PathaoAdapter } from './adapters/pathao.adapter';
+import { BostaAdapter } from './adapters/bosta.adapter';
+import { ShiprocketAdapter } from './adapters/shiprocket.adapter';
+import { TranzoAdapter } from './adapters/tranzo.adapter';
 
 /**
  * Add a new courier = write one adapter class, add it to this constructor, and add the value to the Courier enum.
@@ -15,8 +21,11 @@ import { AramexAdapter } from './adapters/aramex.adapter';
 export class CourierRegistry {
   private readonly adapters: Map<Courier, CourierAdapter>;
 
-  constructor(postex: PostexAdapter, leopards: LeopardsAdapter, tcs: TcsAdapter, fedex: FedexAdapter, dhl: DhlAdapter, aramex: AramexAdapter) {
-    this.adapters = new Map<Courier, CourierAdapter>([postex, leopards, tcs, fedex, dhl, aramex].map((a) => [a.courier, a]));
+  constructor(
+    postex: PostexAdapter, leopards: LeopardsAdapter, tcs: TcsAdapter, fedex: FedexAdapter, dhl: DhlAdapter, aramex: AramexAdapter,
+    ecourier: EcourierAdapter, redx: RedxAdapter, pathao: PathaoAdapter, bosta: BostaAdapter, shiprocket: ShiprocketAdapter, tranzo: TranzoAdapter,
+  ) {
+    this.adapters = new Map<Courier, CourierAdapter>([postex, leopards, tcs, fedex, dhl, aramex, ecourier, redx, pathao, bosta, shiprocket, tranzo].map((a) => [a.courier, a]));
   }
 
   get(courier: Courier): CourierAdapter {

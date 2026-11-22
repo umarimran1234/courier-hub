@@ -14,6 +14,12 @@ enum Courier {
   FEDEX
   DHL
   ARAMEX
+  ECOURIER
+  REDX
+  PATHAO
+  BOSTA
+  SHIPROCKET
+  TRANZO
 }
 
 enum ShipmentStatus {
